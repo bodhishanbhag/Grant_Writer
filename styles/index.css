@@ -1,0 +1,16 @@
+.gnome-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.gnome-img {
+  width: 150px; 
+  height: auto;
+}
+
+.gnome-media {
+  width: 200px; 
+  height: auto;
+  display: block;
+}
