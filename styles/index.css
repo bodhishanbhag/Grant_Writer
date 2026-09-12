@@ -330,6 +330,13 @@ h1 {
   font-size: 0.9rem;
 }
 
+.search-match {
+  border-radius: 3px;
+  padding: 0 0.12em;
+  background: rgba(255, 169, 47, 0.72);
+  color: var(--earth);
+}
+
 #results {
   display: grid;
   gap: 1rem;

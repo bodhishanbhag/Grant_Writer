@@ -23,7 +23,7 @@
 
     <section class="page-header compact-header" aria-labelledby="page-title">
       <div>
-        <p class="eyebrow">Talk it through with Grant</p>
+        <p class="eyebrow">Talk it out with grant</p>
         <h1 id="page-title">Grant Application Generator</h1>
         <p class="lede">Describe your project like you would to a helpful grant writer. Grant will ask follow-up questions, remember the details, and turn the conversation into a PDF draft when you are ready.</p>
       </div>
@@ -32,6 +32,17 @@
     <section class="chat-layout">
       <aside class="guide-stage" aria-label="Grant the gnome">
         <video class="guide-video" src="images/Gnome%20Waving.mp4" autoplay loop muted playsinline></video>
+        <section class="progress-garden" aria-labelledby="progressTitle">
+          <div class="progress-ring" id="progressRing" style="--progress: 0deg;" role="img" aria-label="0% of required grant details filled">
+            <div class="progress-garden-inner">
+              <video class="plant-video" src="images/Plant%20Growing.mp4" autoplay loop muted playsinline aria-label="A plant growing"></video>
+            </div>
+          </div>
+          <div class="progress-copy">
+            <h2 id="progressTitle">Grant garden</h2>
+            <p><strong id="progressPercent">0%</strong> of required details filled</p>
+          </div>
+        </section>
         <div class="speech-bubble">
           <p class="guide-name">Grant says</p>
           <p id="guideText">Tell me what you are building, who it helps, and what you are asking the government or funder to support. I will ask for the missing pieces as we go.</p>

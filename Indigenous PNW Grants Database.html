@@ -85,7 +85,7 @@
           const bucket = statusBucket(grant.applicationStatus);
           if (statusFilter && bucket !== statusFilter) return false;
           if (!q) return true;
-          const haystack = [grant.name, grant.funder, grant.based, ...(grant.focusAreas || [])].join(" ").toLowerCase();
+          const haystack = collectText(grant).toLowerCase();
           return haystack.includes(q);
         });
 
@@ -93,7 +93,43 @@
         document.getElementById("empty-state").hidden = filtered.length > 0;
 
         filtered.forEach((grant) => {
-          resultsEl.appendChild(createGrantCard(grant, statusBucket(grant.applicationStatus), badgeLabel));
+          const card = createGrantCard(grant, statusBucket(grant.applicationStatus), badgeLabel);
+          highlightMatches(card, q);
+          resultsEl.appendChild(card);
+        });
+      }
+
+      function collectText(value) {
+        if (value === null || value === undefined) return "";
+        if (Array.isArray(value)) return value.map(collectText).join(" ");
+        if (typeof value === "object") return Object.values(value).map(collectText).join(" ");
+        return String(value);
+      }
+
+      function highlightMatches(root, query) {
+        if (!query) return;
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const matcher = new RegExp(`(${escaped})`, "gi");
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+        textNodes.forEach((textNode) => {
+          if (!textNode.nodeValue.trim()) return;
+          const parts = textNode.nodeValue.split(matcher);
+          if (parts.length === 1) return;
+          const fragment = document.createDocumentFragment();
+          parts.forEach((part, index) => {
+            if (index % 2 === 1) {
+              const mark = document.createElement("mark");
+              mark.className = "search-match";
+              mark.textContent = part;
+              fragment.appendChild(mark);
+            } else {
+              fragment.appendChild(document.createTextNode(part));
+            }
+          });
+          textNode.parentNode.replaceChild(fragment, textNode);
         });
       }
 

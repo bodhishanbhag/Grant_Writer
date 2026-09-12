@@ -41,8 +41,13 @@ const statusEl = document.getElementById("status");
 const guideText = document.getElementById("guideText");
 const thinkingIndicator = document.getElementById("thinkingIndicator");
 const guideVideo = document.querySelector(".guide-video");
+const progressRing = document.getElementById("progressRing");
+const progressPercent = document.getElementById("progressPercent");
+const plantVideo = document.querySelector(".plant-video");
 const GUIDE_WAVING_VIDEO = "images/Gnome%20Waving.mp4";
 const GUIDE_THINKING_VIDEO = "images/Grant_Thinking.mp4";
+
+if (plantVideo) plantVideo.playbackRate = 0.25;
 
 const restoredConversation = loadSavedConversation();
 if (restoredConversation) {
@@ -57,6 +62,7 @@ if (restoredConversation) {
     "Hi, I'm Grant. Start by telling me what project you want funded, who it helps, and what you are asking the government or funder to pay for."
   );
 }
+updateProgressGarden();
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -112,6 +118,15 @@ function saveConversation() {
   }
 }
 
+function updateProgressGarden() {
+  if (!progressRing || !progressPercent) return;
+  const filledCount = REQUIRED_FIELDS.filter((field) => String(getPath(state.payload, field.path)).trim()).length;
+  const percentage = Math.round((filledCount / REQUIRED_FIELDS.length) * 100);
+  progressRing.style.setProperty("--progress", `${percentage * 3.6}deg`);
+  progressPercent.textContent = `${percentage}%`;
+  progressRing.setAttribute("aria-label", `${percentage}% of required grant details filled`);
+}
+
 function renderMessage(role, text) {
   const messageRow = document.createElement("div");
   messageRow.className = `chat-message-row ${role}`;
@@ -155,6 +170,7 @@ async function sendChat(text, finishRequested) {
 
     state.payload = mergePayload(state.payload, body.payload || {});
     saveConversation();
+    updateProgressGarden();
     const reply = body.assistantMessage || "I updated the draft notes. Tell me anything else I should know.";
     addMessage("assistant", reply);
     guideText.textContent = reply;
@@ -284,6 +300,7 @@ function applyMissingFormValues() {
     setPath(state.payload, field.name, field.value.trim());
   });
   saveConversation();
+  updateProgressGarden();
 }
 
 function validateMissingForm() {
