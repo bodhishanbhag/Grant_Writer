@@ -1,0 +1,146 @@
+: root {
+  --primary-green: #529D49;
+  --dark-green: #407A4D;
+  --accent-red: #DB3336;
+  --dark-text: #413C3E;
+  --bg-color: #f7f9f6;
+  --card-bg: #ffffff;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--dark-text);
+  margin: 0;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+h1 {
+  background-color: var(--primary-green);
+  color: #ffffff;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+  text-align: center;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+p {
+  max-width: 650px;
+  text-align: center;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+
+#grantForm {
+  background: var(--card-bg);
+  width: 100%;
+  max-width: 650px;
+  padding: 30px;
+  border-radius: 12px;
+  border: 2px solid var(--primary-green);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+}
+
+/* Fieldset section styling */
+fieldset {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  background-color: #fafafa;
+}
+
+legend {
+  font-weight: bold;
+  color: var(--dark-green);
+  padding: 0 8px;
+  font-size: 1.1rem;
+}
+
+/* Form Labels & Inputs */
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="date"],
+input[type="url"],
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input: focus,
+textarea: focus {
+  outline: none;
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 3px rgba(82, 157, 73, 0.2);
+}
+
+textarea {
+  resize: vertical;
+}
+
+small {
+  color: #666;
+  line-height: 1.4;
+  display: block;
+  margin-top: 4px;
+}
+
+/* Navigation Buttons */
+button {
+  background-color: var(--dark-green);
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+button: hover {
+  background-color: var(--primary-green);
+}
+
+button: active {
+  transform: scale(0.98);
+}
+
+#backBtn {
+  background-color: #888;
+}
+
+#backBtn: hover {
+  background-color: #666;
+}
+
+#generateBtn {
+  background-color: var(--accent-red);
+}
+
+#generateBtn: hover {
+  background-color: #b8282b;
+}
