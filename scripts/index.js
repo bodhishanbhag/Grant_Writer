@@ -114,7 +114,7 @@ function saveConversation() {
       payload: state.payload,
     }));
   } catch (_) {
-    // Storage can be unavailable for file pages or private browsing sessions.
+    // localStorage isn't always available (file:// pages, private browsing)
   }
 }
 
@@ -222,6 +222,7 @@ function mergePayload(base, update) {
 
 function mergeObject(target, source) {
   if (!source || typeof source !== "object") return target;
+  // empty values never overwrite something we already have
   Object.entries(source).forEach(([key, value]) => {
     if (value === null || value === undefined || value === "") return;
     if (Array.isArray(value)) {
@@ -335,6 +336,7 @@ async function generatePdf() {
   }
 
   statusEl.textContent = "Generating PDF... this can take 15-30 seconds.";
+  // timeline of this request, merged with the backend's own log later
   const requestId = Math.random().toString(36).slice(2, 8);
   const clientStart = Date.now();
   const clientEvents = [];
@@ -456,6 +458,8 @@ function parseWarningsHeader(response) {
   }
 }
 
+// Shows where the RFA requirements actually came from, so nobody
+// submits a draft trusting an unverified source.
 function renderWarnings(warnings) {
   const container = document.getElementById("warnings");
   container.innerHTML = "";
