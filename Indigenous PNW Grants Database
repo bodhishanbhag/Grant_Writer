@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Indigenous PNW Grants Database</title>
+<link rel="stylesheet" href="styles/index.css">
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; color: #1c1a17; line-height: 1.45; }
+  h1 { margin-bottom: 4px; }
+  .subtitle { color: #555; margin-top: 0; }
+  .banner { background: #fdf3e3; border: 1px solid #e6c98a; border-radius: 8px; padding: 12px 16px; font-size: 0.92em; margin: 16px 0 24px; }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .controls input[type="search"] { flex: 1 1 260px; padding: 8px 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 6px; }
+  .controls select { padding: 8px 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 6px; }
+  #meta-line { color: #666; font-size: 0.85em; margin-bottom: 18px; }
+  .grant-card { border: 1px solid #ddd; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; background: #fff; }
+  .grant-card h2 { margin: 0 0 2px; font-size: 1.15em; }
+  .grant-card .funder-line { color: #555; font-size: 0.9em; margin-bottom: 10px; }
+  .badge { display: inline-block; font-size: 0.75em; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  .badge.open { background: #e3f3e6; color: #1e6b2f; }
+  .badge.closed { background: #fbe4e4; color: #a02323; }
+  .badge.check { background: #eee7fb; color: #4b3a94; }
+  .grant-card dl { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; margin: 0; font-size: 0.92em; }
+  .grant-card dt { font-weight: 600; color: #444; }
+  .grant-card dd { margin: 0; }
+  .tags span { display: inline-block; background: #f0ede6; border-radius: 999px; padding: 2px 9px; margin: 2px 4px 2px 0; font-size: 0.78em; }
+  .fit-note { margin-top: 10px; padding: 8px 10px; background: #f4faf5; border-left: 3px solid #6aa87a; font-size: 0.88em; }
+  .verify-note { margin-top: 8px; font-size: 0.78em; color: #888; }
+  a.grant-link { display: inline-block; margin-top: 10px; font-weight: 600; }
+  #empty-state { color: #777; font-style: italic; padding: 24px 0; }
+  #error-state { color: #a02323; padding: 24px 0; }
+</style>
+</head>
+<body>
+  <h1>Indigenous-Specific Grants — Seattle / PNW</h1>
+  <p class="subtitle">A living, re-verifiable database of funders prioritizing Tribal nations and Native-led/Native-serving organizations in the Seattle area and wider Pacific Northwest.</p>
+
+  <div class="banner">
+    <strong>Before citing any of this in a real application:</strong> re-check the entry's own link. Deadlines, award amounts, and whether an application is even open change often — this page shows each entry's last-verified date for exactly that reason.
+  </div>
+
+  <div class="controls">
+    <input type="search" id="search-box" placeholder="Search by name, focus area, or funder…">
+    <select id="status-filter">
+      <option value="">All application statuses</option>
+      <option value="open">Open</option>
+      <option value="closed">Invitation-only / closed</option>
+      <option value="check">Check current cycle</option>
+    </select>
+  </div>
+
+  <p id="meta-line"></p>
+  <div id="results"></div>
+  <div id="empty-state" style="display:none;">No entries match that search.</div>
+  <div id="error-state" style="display:none;"></div>
+
+<script>
+async function loadGrants() {
+  const resultsEl = document.getElementById('results');
+  const metaEl = document.getElementById('meta-line');
+  const errorEl = document.getElementById('error-state');
+  let data;
+  try {
+    const res = await fetch('data/indigenous-pnw-grants.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (err) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Could not load the grants database (' + err.message + '). Make sure data/indigenous-pnw-grants.json is deployed alongside this page.';
+    return;
+  }
+
+  metaEl.textContent = `${data.grants.length} entries — database last updated ${data._meta.lastUpdated}`;
+
+  function statusBucket(statusText) {
+    const s = statusText.toLowerCase();
+    if (s.includes('closed') || s.includes('invitation-only')) return 'closed';
+    if (s.includes('check') || s.includes('important')) return 'check';
+    return 'open';
+  }
+
+  function badgeLabel(bucket) {
+    return bucket === 'open' ? 'Open' : bucket === 'closed' ? 'Invite-only / closed' : 'Check current cycle';
+  }
+
+  function render(filterText, statusFilter) {
+    const q = filterText.trim().toLowerCase();
+    const filtered = data.grants.filter((g) => {
+      const bucket = statusBucket(g.applicationStatus);
+      if (statusFilter && bucket !== statusFilter) return false;
+      if (!q) return true;
+      const haystack = [g.name, g.funder, g.based, ...(g.focusAreas || [])].join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+
+    resultsEl.innerHTML = '';
+    document.getElementById('empty-state').style.display = filtered.length ? 'none' : 'block';
+
+    filtered.forEach((g) => {
+      const bucket = statusBucket(g.applicationStatus);
+      const card = document.createElement('div');
+      card.className = 'grant-card';
+      card.innerHTML = `
+        <h2>${g.name}<span class="badge ${bucket}">${badgeLabel(bucket)}</span></h2>
+        <div class="funder-line">${g.funder} — ${g.based}</div>
+        <div class="tags">${(g.focusAreas || []).map((t) => `<span>${t}</span>`).join('')}</div>
+        <dl>
+          <dt>Geographic scope</dt><dd>${g.geographicScope}</dd>
+          <dt>Eligibility</dt><dd>${g.eligibilitySummary}</dd>
+          <dt>Typical award</dt><dd>${g.typicalAward}</dd>
+          <dt>Status</dt><dd>${g.applicationStatus}</dd>
+          <dt>Deadlines</dt><dd>${g.deadlineNotes}</dd>
+          <dt>How to apply</dt><dd>${g.howToApply}</dd>
+        </dl>
+        <div class="fit-note"><strong>Why it fits a PNW/Seattle impact case:</strong> ${g.pnwImpactFit}</div>
+        <a class="grant-link" href="${g.url}" target="_blank" rel="noopener">Visit funder page →</a>
+        <div class="verify-note">Last verified ${g.lastVerified}. Sources: ${g.sourceNotes}</div>
+      `;
+      resultsEl.appendChild(card);
+    });
+  }
+
+  render('', '');
+
+  document.getElementById('search-box').addEventListener('input', (e) => {
+    render(e.target.value, document.getElementById('status-filter').value);
+  });
+  document.getElementById('status-filter').addEventListener('change', (e) => {
+    render(document.getElementById('search-box').value, e.target.value);
+  });
+}
+
+loadGrants();
+</script>
+</body>
+</html>
