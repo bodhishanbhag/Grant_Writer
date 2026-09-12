@@ -68,7 +68,7 @@ p {
   box-sizing: border-box;
 }
 
-/* Fieldset section styling */
+
 fieldset {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -84,7 +84,7 @@ legend {
   font-size: 1.1rem;
 }
 
-/* Form Labels & Inputs */
+
 label {
   display: block;
   font-weight: 600;
@@ -125,7 +125,7 @@ small {
   margin-top: 4px;
 }
 
-/* Navigation Buttons */
+
 button {
   background-color: var(--dark-green);
   color: white;
