@@ -1,54 +1,26 @@
-/**
- * AI Grant Writer — Cloudflare Worker backend
- * -----------------------------------------------------------------
- * SINGLE FILE, NO DEPENDENCIES. Paste this whole file into the
- * Cloudflare dashboard's Worker code editor and deploy — no npm,
- * no wrangler, no build step required. PDF generation is written
- * by hand below (no pdf-lib or any other library), because the
- * dashboard editor can't bundle npm packages.
- *
- * Routes:
- *   POST /chat   -> { assistantMessage, payload, missingRequired }
- *   POST /draft  -> { draft: {...} }  JSON narrative only (debugging)
- *   POST /pdf    -> application/pdf   full assembled grant application
- *
- * Input: JSON body matching SCHEMA.md (organization / project /
- * narrative / budget / additionalNotes). Every field is optional.
- *
- * Design principle: factual fields (org name, EIN, dollar amounts,
- * dates, contact info) are NEVER passed through the LLM for
- * rewriting — they're copied verbatim from the input into the PDF.
- * Only the narrative/prose sections are LLM-generated, and only from
- * notes the user actually provided.
- *
- * Secret required (Settings -> Variables and Secrets -> Add variable,
- * type "Secret"):
- *   OPENAI_API_KEY
- * Optional plain variables:
- *   OPENAI_MODEL     - defaults to "gpt-4o" (used for narrative generation)
- *   CHAT_MODEL       - defaults to OPENAI_MODEL/gpt-4o (used for Grant chat)
- *   SEARCH_MODEL     - defaults to "gpt-4.1-mini" (used ONLY for the RFA
- *                       web search fallback -- must be a model OpenAI's
- *                       Responses API actually supports the web_search
- *                       tool for; gpt-4o is NOT on that list as of this
- *                       writing. gpt-4.1-mini is the cheap/fast choice;
- *                       gpt-5.5 is more thorough but a reasoning model
- *                       and meaningfully more expensive per call)
- *   ALLOWED_ORIGIN   - defaults to "*"
- *
- * RFA GROUNDING (important limitation, read this):
- * This worker does NOT try to guess which real grant program the
- * applicant is targeting from a funding-source name. Guessing and
- * then presenting invented "requirements" as real would be worse
- * than no formatting guidance at all for a government submission.
- * Instead, if the caller provides `project.rfaUrl` (a link to the
- * actual RFA/guidelines page) and/or `project.rfaText` (pasted
- * excerpt of the actual rules), this worker fetches/uses that TEXT
- * as the only source of truth for funder-specific requirements, and
- * says so explicitly in the output. No URL/text provided -> the
- * compliance checklist stays generic and says so, rather than
- * inventing specifics.
- */
+// Cloudflare Worker backend for the grant writer. One file, no
+// dependencies — paste it straight into the Worker code editor and
+// deploy, no npm or build step.
+//
+// Routes: POST /chat (talk to Grant), POST /draft (narrative JSON,
+// for debugging), POST /pdf (the real output).
+//
+// Facts — org name, EIN, dollar amounts, dates, contact info — never
+// go through the LLM. They're copied straight from the input into
+// the PDF. Only the narrative sections get generated, and only from
+// notes the applicant actually gave us.
+//
+// Needs an OPENAI_API_KEY secret. Optional env vars: OPENAI_MODEL
+// (narrative gen, default gpt-4o), CHAT_MODEL (Grant chat, falls
+// back to OPENAI_MODEL), SEARCH_MODEL (RFA web-search fallback,
+// default gpt-4.1-mini), ALLOWED_ORIGIN (default "*").
+//
+// On RFA grounding: we don't try to guess which real grant program
+// someone means from a funding-source name — inventing "requirements"
+// for a government submission is worse than giving none. If the
+// caller gives us project.rfaUrl or project.rfaText, that's our only
+// source of truth for funder-specific requirements. No source given,
+// no requirements guessed — the checklist just says so.
 
 const NARRATIVE_SECTIONS = [
   { key: "executiveSummary", title: "Executive Summary" },
@@ -182,15 +154,10 @@ function safe(val, fallback = "[Not provided]") {
   return val && String(val).trim() ? String(val).trim() : fallback;
 }
 
-/**
- * Lightweight structured logger. Every entry is also console.log'd
- * (visible via `wrangler tail` server-side) AND collected so it can be
- * shipped back to the browser -- as a response header for the /pdf
- * route (binary body can't carry JSON), and inline in the JSON body
- * for /draft and error responses. The frontend prints these to the
- * browser console (see scripts/index.js) so both sides of a request
- * are debuggable from one place without needing server log access.
- */
+// Every entry gets console.log'd and collected, so it can also be
+// sent back to the browser — header on /pdf (binary body can't carry
+// JSON), inline JSON body elsewhere. Lets you debug a request from
+// the browser console without needing server log access.
 function createLogger() {
   const start = Date.now();
   const entries = [];
@@ -213,13 +180,10 @@ function createLogger() {
   };
 }
 
-/**
- * Best-effort HTML -> plain text. No DOM parser is available in a
- * dependency-free Worker, so this is regex-based: strip script/style
- * blocks, strip remaining tags, decode a handful of common entities,
- * collapse whitespace. Good enough to hand a government RFA page's
- * text content to the model — not a general-purpose HTML parser.
- */
+// Quick HTML -> text. No DOM parser in a dependency-free Worker, so
+// it's regex: strip script/style, strip tags, decode common entities,
+// collapse whitespace. Fine for handing an RFA page to the model —
+// not a real parser.
 function htmlToText(html) {
   return String(html || "")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -239,13 +203,11 @@ function htmlToText(html) {
     .trim();
 }
 
-const MAX_RFA_CHARS = 12000; // keep prompt size sane
+const MAX_RFA_CHARS = 12000; // keep the prompt a sane size
 
-/**
- * Fetches project.rfaUrl (if provided) and combines it with any
- * pasted project.rfaText. Never throws — a fetch failure just means
- * we proceed without that source, with a note explaining why.
- */
+// Fetches project.rfaUrl (if given) and combines it with any pasted
+// project.rfaText. Never throws — a failed fetch just means we go on
+// without that source, with a note explaining why.
 async function resolveRfaText(proj) {
   const parts = [];
   let fetchNote = null;
@@ -286,33 +248,18 @@ async function resolveRfaText(proj) {
   return { text: combined, fetchNote };
 }
 
-/**
- * Fallback used ONLY when the caller supplied no rfaUrl/rfaText: makes
- * a separate OpenAI call (Responses API, web_search tool) using the
- * applicant's own literal `fundingSource` text as the search query.
- *
- * Deliberately does NOT try to guess a funder from vague project
- * details -- it only runs when fundingSource is non-empty, and the
- * search prompt explicitly instructs the model to say "no exact
- * match found" rather than substituting a similar-sounding program.
- * This reduces, but does not eliminate, the risk of grounding on the
- * wrong program -- the resulting source URL(s) are surfaced in the
- * PDF so the applicant can verify before trusting any of it.
- */
+// Only runs when the caller gave no rfaUrl/rfaText: does a real web
+// search for the funder's actual guidelines instead of guessing.
+// Only fires when fundingSource is non-empty, and the prompt tells
+// the model to say "no match" rather than substitute something
+// similar-sounding. Doesn't eliminate the risk of grounding on the
+// wrong program, but the source URLs get surfaced so the applicant
+// can check.
 async function searchForRfaGuidelines(env, fundingSource, log) {
-  // gpt-4o (the default used for narrative generation) is NOT on
-  // OpenAI's current supported-model list for the Responses API
-  // web_search tool. gpt-5.5 is the fully-featured option but is a
-  // reasoning model -- meaningfully more expensive per call, since it
-  // spends tokens on hidden reasoning before writing an answer.
-  // gpt-4.1-mini is also on OpenAI's supported list (with some
-  // limitations: no domain filters, 128k search context) but is a
-  // non-reasoning model, which is both cheaper per token AND doesn't
-  // burn a hidden reasoning budget -- a much better cost fit for a
-  // single "does this program exist, what does its page say" lookup.
-  // Override via the SEARCH_MODEL environment variable if you want
-  // gpt-5.5's more thorough multi-step search behavior back, or if
-  // OpenAI's supported-model list changes.
+  // gpt-4o isn't on OpenAI's supported list for the Responses API's
+  // web_search tool. gpt-4.1-mini is: cheap, non-reasoning, good fit
+  // for a "does this program exist" lookup. Set SEARCH_MODEL if you
+  // want gpt-5.5's more thorough (and pricier) search instead.
   const model = env.SEARCH_MODEL || "gpt-4.1-mini";
   const query = String(fundingSource).trim();
 
@@ -345,12 +292,9 @@ Use NO_MATCH_FOUND if you cannot find an official, current, EXACT match for this
       model,
       tools: [{ type: "web_search" }],
       input: prompt,
-      // gpt-5.5 (reasoning model) needed >= 8192 here or risked
-      // truncating before writing a final answer. gpt-4.1-mini is
-      // non-reasoning -- it writes directly, no hidden reasoning
-      // budget to protect -- so a smaller cap is fine and saves cost.
-      // Raise this back toward 8192 if you switch SEARCH_MODEL back
-      // to a reasoning model like gpt-5.5.
+      // Reasoning models can get cut off before writing an answer if
+      // this is too low. Bump it back toward 8192 if SEARCH_MODEL is
+      // switched to one (e.g. gpt-5.5).
       max_output_tokens: 3072,
     }),
   });
@@ -366,16 +310,13 @@ Use NO_MATCH_FOUND if you cannot find an official, current, EXACT match for this
     log?.log("search:incomplete", `status=${data.status}`);
   }
 
-  // Verify the model actually invoked the search tool rather than
-  // just answering from memory -- per OpenAI's own guidance, check
-  // for a web_search_call item in the output. Without this check we
-  // cannot tell a genuine "nothing found" from "never actually
-  // looked."
+  // Check the model actually called web_search rather than just
+  // answering from memory — otherwise we can't tell "found nothing"
+  // from "never looked."
   const output = Array.isArray(data.output) ? data.output : [];
   const searchCallCount = output.filter((item) => item.type === "web_search_call").length;
   log?.log("search:tool_invocations", String(searchCallCount));
 
-  // Prefer the convenience field; fall back to scanning output items.
   let text = data.output_text;
   if (!text) {
     text = output
@@ -397,10 +338,8 @@ Use NO_MATCH_FOUND if you cannot find an official, current, EXACT match for this
   const rest = text.split("\n").slice(1).join("\n").trim();
 
   if (searchCallCount === 0) {
-    // The model answered without ever calling the search tool. Its
-    // MATCH_FOUND/NO_MATCH_FOUND claim is not trustworthy either way
-    // -- treat this the same as "not found" but say why, rather than
-    // presenting an unverified/possibly hallucinated answer.
+    // Model skipped the tool entirely, so its match/no-match claim
+    // isn't trustworthy either way. Treat as "not found" and say why.
     log?.log("search:untrusted", "model produced an answer without invoking web_search");
     return {
       found: false,
@@ -597,22 +536,19 @@ async function callGrantChat(env, body) {
   };
 }
 
-// ============================================================
-// Hand-rolled PDF writer. No dependencies. Supports plain text
-// only (Helvetica / Helvetica-Bold, one size, left-aligned),
-// which is all this document needs.
-// ============================================================
+// ---- Hand-rolled PDF writer ----
+// No dependencies, plain text only (Helvetica / Helvetica-Bold, one
+// size, left-aligned) — that's all this document needs.
 
-const PAGE_WIDTH = 612; // 8.5in * 72 (US Letter)
-const PAGE_HEIGHT = 792; // 11in * 72
-const MARGIN = 72; // 1 inch
+const PAGE_WIDTH = 612; // US Letter, points (72pt/in)
+const PAGE_HEIGHT = 792;
+const MARGIN = 72;
 const BODY_SIZE = 11;
 const LINE_HEIGHT = 14;
 
-// Standard Adobe Helvetica AFM character widths (per 1000 em units),
-// for ASCII 32-126. Same table used as an approximation for the
-// bold variant (headings are short single lines, so the minor
-// inaccuracy never causes an overflow in practice).
+// Adobe's standard Helvetica AFM widths (per 1000 em, ASCII 32-126),
+// reused as an approximation for bold too — headings are short
+// single lines, so it never actually causes an overflow.
 const HELV_WIDTHS = {
   32: 278, 33: 278, 34: 355, 35: 556, 36: 556, 37: 889, 38: 667, 39: 191,
   40: 333, 41: 333, 42: 389, 43: 584, 44: 278, 45: 333, 46: 278, 47: 278,
@@ -629,10 +565,8 @@ const HELV_WIDTHS = {
   124: 260, 125: 334, 126: 584,
 };
 
-// Maps a handful of common "smart" Unicode punctuation characters to
-// their WinAnsiEncoding byte values; anything else outside ASCII
-// becomes "?" so the PDF never gets corrupted by an unrepresentable
-// character.
+// Common "smart" punctuation mapped to WinAnsi bytes; anything else
+// outside ASCII becomes "?" instead of corrupting the PDF.
 const WINANSI_MAP = {
   "\u2014": 0x97, // em dash
   "\u2013": 0x96, // en dash
@@ -669,10 +603,9 @@ function textWidth(text, size) {
 }
 
 function wrapText(text, size, maxWidth) {
-  // NOTE: intentionally NOT applying toWinAnsi here — that mapping
-  // happens exactly once, in drawLine, right before the text is
-  // stored as a draw op. Mapping here too would double-encode
-  // already-mapped bytes on the next pass and corrupt them.
+  // toWinAnsi happens once, in drawLine, right before the text
+  // becomes a draw op — doing it here too would double-encode and
+  // corrupt already-mapped bytes.
   const paragraphs = String(text || "").split(/\n+/);
   const lines = [];
   for (const para of paragraphs) {
@@ -697,11 +630,8 @@ function escapePdfText(text) {
   return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-/**
- * Builds a full PDF file (as a byte array) from a simple list of
- * pages, each a list of draw ops: { text, x, y, size, bold }.
- * y is measured from the bottom of the page (PDF convention).
- */
+// Turns a list of pages (each a list of draw ops — text, line, or
+// rect) into actual PDF bytes. y is measured from the bottom, PDF-style.
 function assemblePdfBytes(pagesOps) {
   const objects = []; // { num, body } in final object-number order
   let nextNum = 1;
@@ -733,7 +663,7 @@ function assemblePdfBytes(pagesOps) {
           2
         )} ${op.height.toFixed(2)} re ${paintOp}\n`;
       } else {
-        // default: text
+        // anything else is text
         const font = op.bold ? "F2" : "F1";
         stream += `BT /${font} ${op.size} Tf ${op.x} ${op.y.toFixed(2)} Td (${escapePdfText(
           op.text
@@ -804,8 +734,8 @@ function assemblePdfBytes(pagesOps) {
 
   out += `trailer\n<< /Size ${totalObjects} /Root ${catalogNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
-  // Every character used above is guaranteed < 256 (ASCII PDF syntax
-  // plus WinAnsi-mapped text), so a direct charCode -> byte map is safe.
+  // Every char here is under 256 (ASCII PDF syntax + WinAnsi-mapped
+  // text), so charCode -> byte is safe.
   const bytes = new Uint8Array(out.length);
   for (let i = 0; i < out.length; i++) {
     bytes[i] = out.charCodeAt(i) & 0xff;
@@ -848,22 +778,20 @@ function buildPdf(data, narrative) {
     drawLine(text, { size, bold: true, gap: LINE_HEIGHT + 4 });
   }
 
-  // size lets a caller shrink/enlarge a specific block (e.g. fine print,
-  // or a de-emphasized note) without affecting the rest of the document.
+  // size lets you shrink/grow just this one block, e.g. fine print.
   function drawParagraphBlock(text, opts = {}) {
     const { size = BODY_SIZE, indent = 0 } = opts;
     const lines = wrapText(text, size, maxWidth - indent);
     for (const line of lines) drawLine(line, { size, indent });
   }
 
-  // Adds vertical whitespace without drawing anything -- use this to
-  // open up breathing room around a box, before a signature block, etc.
+  // Just vertical breathing room, doesn't draw anything.
   function drawSpacer(amount) {
     ensureSpace(amount);
     y -= amount;
   }
 
-  // A plain horizontal rule, e.g. to separate a section visually.
+  // A plain horizontal rule to separate sections.
   function drawHRule(opts = {}) {
     const { widthPts = maxWidth, indent = 0, lineWidth = 1 } = opts;
     ensureSpace(10);
@@ -878,8 +806,7 @@ function buildPdf(data, narrative) {
     y -= 10;
   }
 
-  // An empty bordered box -- e.g. for an official-use-only stamp area,
-  // a photo/attachment placeholder, or to visually frame a section.
+  // Empty bordered box — stamp area, attachment placeholder, whatever.
   function drawBox(heightPts, opts = {}) {
     const { widthPts = maxWidth, indent = 0 } = opts;
     ensureSpace(heightPts + 6);
@@ -893,8 +820,7 @@ function buildPdf(data, narrative) {
     y -= heightPts + 6;
   }
 
-  // A single "____________  Label" signature line: draws the blank
-  // line, then the label beneath it, left-aligned at the given indent.
+  // A single "____________  Label" line.
   function drawSignatureLine(label, opts = {}) {
     const { widthPts = 220, indent = 0 } = opts;
     ensureSpace(34);
@@ -910,17 +836,13 @@ function buildPdf(data, narrative) {
     drawLine(label, { size: 9, indent, gap: 20 });
   }
 
-  // Two signature lines side by side (e.g. Signature + Date), followed
-  // by a Printed Name / Title line beneath. This is the concrete
-  // example of the box/line/spacer primitives above -- add more of
-  // these anywhere in the document by calling drawSignatureLine /
-  // drawHRule / drawBox / drawSpacer directly.
+  // Signature + Date side by side, then a Printed Name line beneath.
   function drawSignatureBlock(roleLabel) {
-    ensureSpace(90); // guarantee the whole block stays on one page
+    ensureSpace(90); // keep the whole block on one page
     drawSpacer(10);
     drawLine(roleLabel, { size: 11, bold: true, gap: 20 });
     drawSignatureLine("Signature", { widthPts: 220 });
-    y += 32; // pull back up so the Date line sits beside, not below
+    y += 32; // back up so Date sits beside Signature, not below it
     drawSignatureLine("Date", { widthPts: 120, indent: 260 });
     drawSignatureLine("Printed Name and Title", { widthPts: 320 });
   }
@@ -946,13 +868,10 @@ function buildPdf(data, narrative) {
   drawParagraphBlock(`Total Project Cost: ${safe((data.budget || {}).totalProjectCost)}`);
 
   // ---- Narrative sections ----
-  // NOTE: no "AI-drafted" / "verbatim" labels here on purpose. This
-  // PDF is meant to be the actual draft the applicant edits and
-  // submits to the funder -- it should read like a real application,
-  // not like a report about how a tool generated it. Anything about
-  // sourcing, confidence, or what needs review lives on the website
-  // (see the X-Grant-Warnings header below), not in the document
-  // itself.
+  // No "AI-drafted" labels here on purpose — this should read like a
+  // real application, not a report about how a tool made it.
+  // Sourcing/confidence notes live on the website instead
+  // (X-Grant-Warnings header below).
   for (const section of NARRATIVE_SECTIONS) {
     newPage();
     drawHeading(section.title);
@@ -960,11 +879,9 @@ function buildPdf(data, narrative) {
   }
 
   // ---- Certification / signatures ----
-  // (Compliance checklist / funding-requirements warnings intentionally
-  // NOT included here -- that's tool-generated meta-commentary about
-  // this draft, not application content, and is surfaced on the
-  // website instead. This page IS real content: most funders actually
-  // require a signed certification page in the submitted package.)
+  // Compliance checklist stays off this page too — that's commentary
+  // about the draft, not application content. This page is real
+  // though: most funders want an actual signed certification.
   newPage();
   drawHeading("Certification and Authorized Signatures");
   drawParagraphBlock(
@@ -1124,10 +1041,9 @@ export default {
         "_"
       );
 
-      // Everything intentionally left OUT of the submittable PDF --
-      // RFA sourcing status, compliance checklist, raw retrieved text
-      // -- goes here instead, for the website to display directly to
-      // the applicant (not just the browser console).
+      // Everything left out of the submittable PDF — RFA sourcing
+      // status, checklist, raw retrieved text — goes here instead,
+      // for the website to show the applicant directly.
       const warnings = {
         rfaSourceOrigin: narrative._rfaSourceOrigin || null,
         rfaFetchNote: narrative._rfaFetchNote || null,
