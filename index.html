@@ -1,125 +1,140 @@
+
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Grant Writer</title>
-</head>
-
+<head><title>Grant Writer</title></head>
 <body>
-
   <h1>Grant Application Generator</h1>
-  <p>Fill in the information below. Leave anything blank if you don't know it yet.</p>
+  <p>Fill in the fields below. Leave anything blank if you don't have it yet; the draft will mark it as needing your input rather than making something up.</p>
 
   <p id="stepLabel"></p>
 
   <form id="grantForm">
 
-    <!-- ORGANIZATION -->
     <fieldset id="step-organization">
       <legend>Organization</legend>
 
-      <label>
-        Organization Name<br>
+      <label>Organization / Tribe Name<br>
         <input type="text" name="organization.name">
       </label><br><br>
 
-      <label>
-        Organization Type<br>
+      <label>Organization Type (e.g. Federally Recognized Tribe, 501(c)(3) Nonprofit)<br>
         <input type="text" name="organization.type">
       </label><br><br>
 
-      <label>
-        Contact Name<br>
+      <label>Address<br>
+        <input type="text" name="organization.address">
+      </label><br><br>
+
+      <label>EIN / Tax ID<br>
+        <input type="text" name="organization.ein">
+      </label><br><br>
+
+      <label>Contact Name<br>
         <input type="text" name="organization.contactName">
       </label><br><br>
 
-      <label>
-        Contact Email<br>
-        <input type="email" name="organization.contactEmail">
-      </label>
+      <label>Contact Title<br>
+        <input type="text" name="organization.contactTitle">
+      </label><br><br>
 
+      <label>Contact Email<br>
+        <input type="email" name="organization.contactEmail">
+      </label><br><br>
+
+      <label>Contact Phone<br>
+        <input type="text" name="organization.contactPhone">
+      </label><br><br>
     </fieldset>
 
-
-    <!-- PROJECT -->
     <fieldset id="step-project" hidden>
       <legend>Project</legend>
 
-      <label>
-        Project Title<br>
+      <label>Project Title<br>
         <input type="text" name="project.title">
       </label><br><br>
 
-      <label>
-        Funding Source / Grant Program<br>
+      <label>Funding Source / Grant Program (if known)<br>
         <input type="text" name="project.fundingSource">
       </label><br><br>
 
-      <label>
-        Requested Amount<br>
+      <label>Requested Amount<br>
         <input type="text" name="project.requestedAmount">
       </label><br><br>
 
-      <label>
-        Grant Guidelines / RFA URL (optional)<br>
-        <input type="url" name="project.rfaUrl" size="50">
-      </label>
+      <label>Project Period Start<br>
+        <input type="date" name="project.periodStart">
+      </label><br><br>
 
+      <label>Project Period End<br>
+        <input type="date" name="project.periodEnd">
+      </label><br><br>
+
+      <label>RFA / Guidelines URL (optional, but strongly recommended)<br>
+        <input type="url" name="project.rfaUrl" size="60">
+      </label><br><br>
+
+      <label>Or paste the actual RFA/requirements text (optional, use if the RFA is a PDF)<br>
+        <textarea name="project.rfaText" rows="4" cols="60"></textarea>
+      </label><br>
+
+      <small>
+        Without one of these (or a Funding Source above to auto-search), the compliance checklist and formatting notes will be generic -- the tool will say so plainly rather than guessing which funder's specific rules apply.
+      </small><br><br>
     </fieldset>
 
+    <fieldset id="step-narrative">
+      <legend>Narrative (rough notes — will be expanded into full prose)</legend>
 
-    <!-- NARRATIVE -->
-    <fieldset id="step-narrative" hidden>
-      <legend>Project Information</legend>
-
-      <label>
-        What is the problem or need?<br>
+      <label>Statement of Need<br>
         <textarea name="narrative.statementOfNeed" rows="4" cols="60"></textarea>
       </label><br><br>
 
-      <label>
-        What will your project do?<br>
+      <label>Project Description<br>
         <textarea name="narrative.projectDescription" rows="4" cols="60"></textarea>
       </label><br><br>
 
-      <label>
-        Goals and Objectives<br>
+      <label>Goals and Objectives<br>
         <textarea name="narrative.goalsAndObjectives" rows="4" cols="60"></textarea>
       </label><br><br>
 
-      <label>
-        Who will the project serve?<br>
+      <label>Target Population<br>
         <textarea name="narrative.targetPopulation" rows="3" cols="60"></textarea>
       </label><br><br>
 
-      <label>
-        How will the project be carried out?<br>
+      <label>Methodology (how it will be carried out)<br>
         <textarea name="narrative.methodology" rows="4" cols="60"></textarea>
       </label><br><br>
 
-      <label>
-        How will you measure success?<br>
+      <label>Evaluation Plan (how success will be measured)<br>
         <textarea name="narrative.evaluationPlan" rows="3" cols="60"></textarea>
-      </label>
+      </label><br><br>
 
+      <label>Sustainability Plan (after grant period ends)<br>
+        <textarea name="narrative.sustainabilityPlan" rows="3" cols="60"></textarea>
+      </label><br><br>
+
+      <label>Organizational Capacity (why this org can do it)<br>
+        <textarea name="narrative.organizationalCapacity" rows="3" cols="60"></textarea>
+      </label><br><br>
     </fieldset>
 
-
-    <!-- BUDGET -->
     <fieldset id="step-budget" hidden>
       <legend>Budget</legend>
 
-      <label>
-        Total Project Cost<br>
+      <label>Total Project Cost<br>
         <input type="text" name="budget.totalProjectCost">
       </label><br><br>
 
-      <label>
-        How will the money be used?<br>
-        <textarea name="budget.budgetNarrative" rows="5" cols="60"></textarea>
-      </label>
-
+      <label>Budget Narrative (rough notes on how funds will be used)<br>
+        <textarea name="budget.budgetNarrative" rows="4" cols="60"></textarea>
+      </label><br><br>
     </fieldset>
 
+    <fieldset id="step-notes" hidden>
+      <legend>Additional Notes</legend>
+
+      <textarea name="additionalNotes" rows="3" cols="60"></textarea>
+    </fieldset>
 
     <br>
 
@@ -135,8 +150,5 @@
   <div id="warnings"></div>
 
   <script src="scripts/index.js"></script>
-
 </body>
 </html>
-
-
