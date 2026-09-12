@@ -466,15 +466,14 @@ textarea:disabled {
 
   .guide-stage {
     position: static;
-    grid-template-columns: minmax(110px, 180px) minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: 1fr;
   }
 
   .speech-bubble::before {
-    top: 2rem;
-    left: -0.58rem;
-    border-top: 0;
-    border-bottom: 1px solid rgba(64, 122, 77, 0.28);
+    top: -0.65rem;
+    left: 2rem;
+    border-top: 1px solid rgba(64, 122, 77, 0.28);
+    border-bottom: 0;
     border-left: 1px solid rgba(64, 122, 77, 0.28);
   }
 
