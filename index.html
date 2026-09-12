@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Grant Writer</title>
+</head>
+
+<body>
+
+  <h1>Grant Application Generator</h1>
+  <p>Fill in the information below. Leave anything blank if you don't know it yet.</p>
+
+  <p id="stepLabel"></p>
+
+  <form id="grantForm">
+
+    <!-- ORGANIZATION -->
+    <fieldset id="step-organization">
+      <legend>Organization</legend>
+
+      <label>
+        Organization Name<br>
+        <input type="text" name="organization.name">
+      </label><br><br>
+
+      <label>
+        Organization Type<br>
+        <input type="text" name="organization.type">
+      </label><br><br>
+
+      <label>
+        Contact Name<br>
+        <input type="text" name="organization.contactName">
+      </label><br><br>
+
+      <label>
+        Contact Email<br>
+        <input type="email" name="organization.contactEmail">
+      </label>
+
+    </fieldset>
+
+
+    <!-- PROJECT -->
+    <fieldset id="step-project" hidden>
+      <legend>Project</legend>
+
+      <label>
+        Project Title<br>
+        <input type="text" name="project.title">
+      </label><br><br>
+
+      <label>
+        Funding Source / Grant Program<br>
+        <input type="text" name="project.fundingSource">
+      </label><br><br>
+
+      <label>
+        Requested Amount<br>
+        <input type="text" name="project.requestedAmount">
+      </label><br><br>
+
+      <label>
+        Grant Guidelines / RFA URL (optional)<br>
+        <input type="url" name="project.rfaUrl" size="50">
+      </label>
+
+    </fieldset>
+
+
+    <!-- NARRATIVE -->
+    <fieldset id="step-narrative" hidden>
+      <legend>Project Information</legend>
+
+      <label>
+        What is the problem or need?<br>
+        <textarea name="narrative.statementOfNeed" rows="4" cols="60"></textarea>
+      </label><br><br>
+
+      <label>
+        What will your project do?<br>
+        <textarea name="narrative.projectDescription" rows="4" cols="60"></textarea>
+      </label><br><br>
+
+      <label>
+        Goals and Objectives<br>
+        <textarea name="narrative.goalsAndObjectives" rows="4" cols="60"></textarea>
+      </label><br><br>
+
+      <label>
+        Who will the project serve?<br>
+        <textarea name="narrative.targetPopulation" rows="3" cols="60"></textarea>
+      </label><br><br>
+
+      <label>
+        How will the project be carried out?<br>
+        <textarea name="narrative.methodology" rows="4" cols="60"></textarea>
+      </label><br><br>
+
+      <label>
+        How will you measure success?<br>
+        <textarea name="narrative.evaluationPlan" rows="3" cols="60"></textarea>
+      </label>
+
+    </fieldset>
+
+
+    <!-- BUDGET -->
+    <fieldset id="step-budget" hidden>
+      <legend>Budget</legend>
+
+      <label>
+        Total Project Cost<br>
+        <input type="text" name="budget.totalProjectCost">
+      </label><br><br>
+
+      <label>
+        How will the money be used?<br>
+        <textarea name="budget.budgetNarrative" rows="5" cols="60"></textarea>
+      </label>
+
+    </fieldset>
+
+
+    <br>
+
+    <button type="button" id="backBtn" onclick="prevStep()">Back</button>
+    <button type="button" id="nextBtn" onclick="nextStep()">Next</button>
+    <button type="button" id="generateBtn" onclick="generatePdf()" hidden>
+      Generate PDF
+    </button>
+
+  </form>
+
+  <p id="status"></p>
+  <div id="warnings"></div>
+
+  <script src="scripts/index.js"></script>
+
+</body>
+</html>
+
 
