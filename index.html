@@ -1,165 +1,95 @@
-
 <!DOCTYPE html>
-<html>
-<head><title>Grant Writer</title></head>
-<link rel="stylesheet" href="styles/style.css">
-<link rel="stylesheet" href="styles/index.css">
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grant Writer</title>
+  <link rel="icon" type="image/png" href="images/grant.png">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/style.css">
+</head>
 <body>
-  <h1>Grant Application Generator</h1>
-  <p>Fill in the fields below. Leave anything blank if you don't have it yet; the draft will mark it as needing your input rather than making something up.</p>
+  <main class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="Grant Writer home">
+        <span class="brand-mark"><img class="brand-icon" src="images/grant.png" alt=""></span>
+        <span>Grant Writer</span>
+      </a>
+      <nav class="topnav" aria-label="Primary navigation">
+        <a href="index.html" aria-current="page">Application Generator</a>
+        <a href="Indigenous PNW Grants Database.html">PNW Grants</a>
+      </nav>
+    </header>
 
-  <p id="stepLabel"></p>
+    <section class="page-header compact-header" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">Talk it through with Grant</p>
+        <h1 id="page-title">Grant Application Generator</h1>
+        <p class="lede">Describe your project like you would to a helpful grant writer. Grant will ask follow-up questions, remember the details, and turn the conversation into a PDF draft when you are ready.</p>
+      </div>
+    </section>
 
-  <form id="grantForm">
+    <section class="chat-layout">
+      <aside class="guide-stage" aria-label="Grant the gnome">
+        <video class="guide-video" src="images/Gnome%20Waving.mp4" autoplay loop muted playsinline></video>
+        <div class="speech-bubble">
+          <p class="guide-name">Grant says</p>
+          <p id="guideText">Tell me what you are building, who it helps, and what you are asking the government or funder to support. I will ask for the missing pieces as we go.</p>
+        </div>
+      </aside>
+      <section class="chat-panel panel" aria-label="Conversation with Grant">
+        <header class="chat-header">
+          <div class="chat-avatar chat-avatar-static" aria-hidden="true">
+            <img src="images/grant.png" alt="">
+            <span class="online-dot"></span>
+          </div>
+          <div class="chat-identity">
+            <h2>Grant</h2>
+            <p>Grant Writer <span aria-hidden="true">&middot;</span> Online</p>
+          </div>
+          <span class="chat-context">Application Generator</span>
+        </header>
 
-    <fieldset id="step-organization">
-      <legend>Organization</legend>
+        <div id="chatMessages" class="chat-messages" aria-live="polite">
+          <div id="thinkingIndicator" class="thinking-indicator" hidden aria-live="polite">
+            <video src="images/Grant_Thinking.mp4" autoplay loop muted playsinline aria-hidden="true"></video>
+            <span><strong>Grant</strong> is thinking<span class="thinking-dots" aria-hidden="true">...</span></span>
+          </div>
+        </div>
 
-      <label>Organization / Tribe Name<br>
-        <input type="text" name="organization.name">
-      </label><br><br>
+        <form id="chatForm" class="chat-composer">
+          <label class="sr-only" for="chatInput">Message Grant</label>
+          <textarea id="chatInput" rows="4" placeholder="Explain your project, funding request, community need, timeline, budget, or anything Grant should know."></textarea>
+          <div class="chat-actions">
+            <button type="submit" id="sendBtn">Send</button>
+            <button type="button" id="doneBtn">I'm done explaining</button>
+          </div>
+        </form>
 
-      <label>Organization Type (e.g. Federally Recognized Tribe, 501(c)(3) Nonprofit)<br>
-        <input type="text" name="organization.type">
-      </label><br><br>
+        <section id="missingPanel" class="missing-panel" hidden>
+          <h2>Missing Required Details</h2>
+          <p>Grant has enough project context to keep going, but these starred fields are still needed before the PDF can be generated.</p>
+          <form id="missingForm" class="missing-form"></form>
+          <button type="button" id="generateBtn">Generate PDF</button>
+        </section>
 
-      <label>Address<br>
-        <input type="text" name="organization.address">
-      </label><br><br>
+        <p id="status" role="status" aria-live="polite"></p>
+        <div id="warnings"></div>
+      </section>
+    </section>
+  </main>
 
-      <label>EIN / Tax ID<br>
-        <input type="text" name="organization.ein">
-      </label><br><br>
-
-      <label>Contact Name<br>
-        <input type="text" name="organization.contactName">
-      </label><br><br>
-
-      <label>Contact Title<br>
-        <input type="text" name="organization.contactTitle">
-      </label><br><br>
-
-      <label>Contact Email<br>
-        <input type="email" name="organization.contactEmail">
-      </label><br><br>
-
-      <label>Contact Phone<br>
-        <input type="text" name="organization.contactPhone">
-      </label><br><br>
-    </fieldset>
-
-    <fieldset id="step-project" hidden>
-      <legend>Project</legend>
-
-      <label>Project Title<br>
-        <input type="text" name="project.title">
-      </label><br><br>
-
-      <label>Funding Source / Grant Program (if known)<br>
-        <input type="text" name="project.fundingSource">
-      </label><br><br>
-
-      <label>Requested Amount<br>
-        <input type="text" name="project.requestedAmount">
-      </label><br><br>
-
-      <label>Project Period Start<br>
-        <input type="date" name="project.periodStart">
-      </label><br><br>
-
-      <label>Project Period End<br>
-        <input type="date" name="project.periodEnd">
-      </label><br><br>
-
-      <label>RFA / Guidelines URL (optional, but strongly recommended)<br>
-        <input type="url" name="project.rfaUrl" size="60">
-      </label><br><br>
-
-      <label>Or paste the actual RFA/requirements text (optional, use if the RFA is a PDF)<br>
-        <textarea name="project.rfaText" rows="4" cols="60"></textarea>
-      </label><br>
-
-      <small>
-        Without one of these (or a Funding Source above to auto-search), the compliance checklist and formatting notes will be generic -- the tool will say so plainly rather than guessing which funder's specific rules apply.
-      </small><br><br>
-    </fieldset>
-
-    <fieldset id="step-narrative">
-      <legend>Narrative (rough notes — will be expanded into full prose)</legend>
-
-      <label>Statement of Need<br>
-        <textarea name="narrative.statementOfNeed" rows="4" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Project Description<br>
-        <textarea name="narrative.projectDescription" rows="4" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Goals and Objectives<br>
-        <textarea name="narrative.goalsAndObjectives" rows="4" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Target Population<br>
-        <textarea name="narrative.targetPopulation" rows="3" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Methodology (how it will be carried out)<br>
-        <textarea name="narrative.methodology" rows="4" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Evaluation Plan (how success will be measured)<br>
-        <textarea name="narrative.evaluationPlan" rows="3" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Sustainability Plan (after grant period ends)<br>
-        <textarea name="narrative.sustainabilityPlan" rows="3" cols="60"></textarea>
-      </label><br><br>
-
-      <label>Organizational Capacity (why this org can do it)<br>
-        <textarea name="narrative.organizationalCapacity" rows="3" cols="60"></textarea>
-      </label><br><br>
-    </fieldset>
-
-    <fieldset id="step-budget" hidden>
-      <legend>Budget</legend>
-
-      <label>Total Project Cost<br>
-        <input type="text" name="budget.totalProjectCost">
-      </label><br><br>
-
-      <label>Budget Narrative (rough notes on how funds will be used)<br>
-        <textarea name="budget.budgetNarrative" rows="4" cols="60"></textarea>
-      </label><br><br>
-    </fieldset>
-
-    <fieldset id="step-notes" hidden>
-      <legend>Additional Notes</legend>
-
-      <textarea name="additionalNotes" rows="3" cols="60"></textarea>
-    </fieldset>
-
-    <br>
-
-    <button type="button" id="backBtn" onclick="prevStep()">Back</button>
-    <button type="button" id="nextBtn" onclick="nextStep()">Next</button>
-    <button type="button" id="generateBtn" onclick="generatePdf()" hidden>
-      Generate PDF
-    </button>
-
-  </form>
-
-  <p id="status"></p>
-  <div id="warnings"></div>
+  <footer class="site-footer">
+    <h2>Contact Us</h2>
+    <div class="footer-grid">
+      <p>Angela: azhou@eastsideprep.org</p>
+      <p>Bodhi: bshanbhag@eastsideprep.org</p>
+      <p>Saanvi: ssingh@eastsideprep.org</p>
+      <p>Zimo: zwang@eastsideprep.org</p>
+      <p>Copyright 2026</p>
+    </div>
+  </footer>
 
   <script src="scripts/index.js"></script>
 </body>
 </html>
-
-<footer>
-  <h2>Contact Us</h2>
-  <p>Angela azhou@eastsideprep.org</p>
-  <p>Bodhi bshanbhag@eastsideprep.org</p>
-  <p>Saanvi ssingh@eastsideprep.org</p>
-  <p>Zimo zwang@eastsideprep.org</p>
-  <p>© 2026</p>
-</footer>

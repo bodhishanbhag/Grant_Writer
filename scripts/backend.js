@@ -8,6 +8,7 @@
  * dashboard editor can't bundle npm packages.
  *
  * Routes:
+ *   POST /chat   -> { assistantMessage, payload, missingRequired }
  *   POST /draft  -> { draft: {...} }  JSON narrative only (debugging)
  *   POST /pdf    -> application/pdf   full assembled grant application
  *
@@ -25,6 +26,7 @@
  *   OPENAI_API_KEY
  * Optional plain variables:
  *   OPENAI_MODEL     - defaults to "gpt-4o" (used for narrative generation)
+ *   CHAT_MODEL       - defaults to OPENAI_MODEL/gpt-4o (used for Grant chat)
  *   SEARCH_MODEL     - defaults to "gpt-4.1-mini" (used ONLY for the RFA
  *                       web search fallback -- must be a model OpenAI's
  *                       Responses API actually supports the web_search
@@ -88,6 +90,78 @@ Hard rules:
   "budgetNarrative": "string",
   "complianceChecklist": ["string", "string", ...]
 }`;
+
+const CHAT_SYSTEM_PROMPT = `You are Grant, a friendly gnome guide inside a grant-writing website.
+
+Your job is to have a natural conversation with the applicant, ask useful follow-up questions, and continuously extract the information needed to fill a grant application.
+
+You will receive:
+1. The conversation so far.
+2. The current structured payload.
+3. Whether the user clicked "I'm done explaining."
+
+Hard rules:
+- Do not invent factual details. Only put information into the payload if the applicant clearly provided it.
+- You may lightly organize or summarize narrative notes, but keep the applicant's facts intact.
+- Ask one or two focused questions at a time unless the user is done explaining.
+- If the user is done explaining, stop asking broad project questions and tell them which concrete required details still need to be filled in.
+- Stay in character as Grant: warm, concise, practical, and encouraging. No markdown.
+
+Return ONLY a JSON object with this exact shape:
+{
+  "assistantMessage": "string",
+  "payload": {
+    "organization": {
+      "name": "string",
+      "type": "string",
+      "address": "string",
+      "ein": "string",
+      "contactName": "string",
+      "contactTitle": "string",
+      "contactEmail": "string",
+      "contactPhone": "string"
+    },
+    "project": {
+      "title": "string",
+      "fundingSource": "string",
+      "requestedAmount": "string",
+      "periodStart": "string",
+      "periodEnd": "string",
+      "rfaUrl": "string",
+      "rfaText": "string"
+    },
+    "narrative": {
+      "statementOfNeed": "string",
+      "projectDescription": "string",
+      "goalsAndObjectives": "string",
+      "targetPopulation": "string",
+      "methodology": "string",
+      "evaluationPlan": "string",
+      "sustainabilityPlan": "string",
+      "organizationalCapacity": "string"
+    },
+    "budget": {
+      "totalProjectCost": "string",
+      "budgetNarrative": "string"
+    },
+    "additionalNotes": "string"
+  }
+}`;
+
+const REQUIRED_FIELD_DEFS = [
+  { path: "organization.name", label: "Organization / Tribe Name" },
+  { path: "organization.type", label: "Organization Type" },
+  { path: "organization.contactName", label: "Contact Name" },
+  { path: "organization.contactEmail", label: "Contact Email" },
+  { path: "project.title", label: "Project Title" },
+  { path: "project.requestedAmount", label: "Requested Amount" },
+  { path: "project.periodEnd", label: "Project Period End" },
+  { path: "narrative.statementOfNeed", label: "Statement of Need" },
+  { path: "narrative.projectDescription", label: "Project Description" },
+  { path: "narrative.goalsAndObjectives", label: "Goals and Objectives" },
+  { path: "narrative.methodology", label: "Methodology" },
+  { path: "budget.totalProjectCost", label: "Total Project Cost" },
+];
 
 function corsHeaders(env) {
   return {
@@ -418,6 +492,109 @@ async function callOpenAI(env, userContent) {
     throw new Error("OpenAI did not return valid JSON: " + raw.slice(0, 500));
   }
   return parsed;
+}
+
+function getPath(obj, path) {
+  return path.split(".").reduce((cursor, part) => {
+    if (!cursor || typeof cursor !== "object") return "";
+    return cursor[part];
+  }, obj) || "";
+}
+
+function mergeStructuredPayload(base, update) {
+  const merged = JSON.parse(JSON.stringify(base || {}));
+  mergeObject(merged, update || {});
+  return merged;
+}
+
+function mergeObject(target, source) {
+  if (!source || typeof source !== "object") return target;
+  for (const [key, value] of Object.entries(source)) {
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      target[key] = value.slice();
+    } else if (typeof value === "object") {
+      if (!target[key] || typeof target[key] !== "object") target[key] = {};
+      mergeObject(target[key], value);
+    } else {
+      target[key] = value;
+    }
+  }
+  return target;
+}
+
+function missingRequiredFields(payload) {
+  return REQUIRED_FIELD_DEFS.filter((field) => !String(getPath(payload, field.path) || "").trim());
+}
+
+function compactMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .filter((message) => message && (message.role === "user" || message.role === "assistant"))
+    .slice(-18)
+    .map((message) => ({
+      role: message.role,
+      content: String(message.content || "").slice(0, 4000),
+    }));
+}
+
+async function callGrantChat(env, body) {
+  const model = env.CHAT_MODEL || env.OPENAI_MODEL || "gpt-4o";
+  const currentPayload = body.payload && typeof body.payload === "object" ? body.payload : {};
+  const messages = compactMessages(body.messages);
+  const finishRequested = Boolean(body.finishRequested);
+
+  const userContent = JSON.stringify({
+    finishRequested,
+    currentPayload,
+    missingRequiredFields: missingRequiredFields(currentPayload),
+    conversation: messages,
+  });
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: CHAT_SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.35,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI chat error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const raw = data.choices?.[0]?.message?.content;
+  if (!raw) throw new Error("OpenAI chat response did not contain a completion.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    throw new Error("OpenAI chat did not return valid JSON: " + raw.slice(0, 500));
+  }
+
+  const payload = mergeStructuredPayload(currentPayload, parsed.payload || {});
+  const missingRequired = missingRequiredFields(payload);
+  const fallbackMessage = finishRequested && missingRequired.length
+    ? `I pulled out what I could. I still need: ${missingRequired.map((field) => field.label).join(", ")}.`
+    : "I updated the draft notes. Tell me anything else I should know.";
+
+  return {
+    assistantMessage: safe(parsed.assistantMessage, fallbackMessage),
+    payload,
+    missingRequired,
+  };
 }
 
 // ============================================================
@@ -853,6 +1030,27 @@ export default {
       );
     }
     log.log("request:body parsed", `org="${(body.organization || {}).name || ""}"`);
+
+    if (url.pathname === "/chat") {
+      log.log("chat:requesting");
+      try {
+        const chat = await callGrantChat(env, body);
+        log.log("chat:received", `${chat.missingRequired.length} required fields missing`);
+        return jsonResponse({ ...chat, debugLog: log.entries() }, 200, env);
+      } catch (err) {
+        console.error(err);
+        log.log("chat:failed", String(err.message || err));
+        return jsonResponse(
+          {
+            error: "Failed to continue Grant's conversation.",
+            details: String(err.message || err),
+            debugLog: log.entries(),
+          },
+          502,
+          env
+        );
+      }
+    }
 
     log.log("rfa:resolving", "checking rfaUrl/rfaText");
     const { text: fetchedText, fetchNote } = await resolveRfaText(body.project || {});
