@@ -212,6 +212,23 @@
   text-transform: uppercase;
 }
 
+.clear-conversation-btn {
+  min-height: 36px;
+  border: 1px solid rgba(86, 58, 48, 0.22);
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--earth);
+  font-size: 0.78rem;
+  box-shadow: none;
+}
+
+.clear-conversation-btn:hover {
+  border-color: rgba(219, 51, 54, 0.4);
+  background: rgba(219, 51, 54, 0.08);
+  color: var(--accent-red);
+  box-shadow: none;
+}
+
 .chat-messages {
   display: flex;
   max-height: 54vh;

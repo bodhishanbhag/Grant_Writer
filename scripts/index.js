@@ -37,6 +37,7 @@ const sendBtn = document.getElementById("sendBtn");
 const missingPanel = document.getElementById("missingPanel");
 const missingForm = document.getElementById("missingForm");
 const generateBtn = document.getElementById("generateBtn");
+const clearConversationBtn = document.getElementById("clearConversationBtn");
 const statusEl = document.getElementById("status");
 const guideText = document.getElementById("guideText");
 const thinkingIndicator = document.getElementById("thinkingIndicator");
@@ -77,6 +78,7 @@ doneBtn.addEventListener("click", async () => {
 });
 
 generateBtn.addEventListener("click", generatePdf);
+clearConversationBtn.addEventListener("click", clearConversation);
 missingForm.addEventListener("input", () => {
   applyMissingFormValues();
   updateGenerateButtonState();
@@ -114,8 +116,42 @@ function saveConversation() {
       payload: state.payload,
     }));
   } catch (_) {
-    // localStorage isn't always available (file:// pages, private browsing)
+    // Storage can be unavailable for file pages or private browsing sessions.
   }
+}
+
+function clearConversation() {
+  if (!window.confirm("Clear this conversation and all collected grant details?")) return;
+
+  state.messages = [];
+  state.payload = {
+    organization: {},
+    project: {},
+    narrative: {},
+    budget: {},
+    additionalNotes: "",
+  };
+
+  chatMessages.innerHTML = "";
+  chatMessages.appendChild(thinkingIndicator);
+  thinkingIndicator.hidden = true;
+  missingForm.innerHTML = "";
+  missingPanel.hidden = true;
+  document.getElementById("warnings").innerHTML = "";
+  guideText.textContent = "Tell me what you are building, who it helps, and what you are asking the government or funder to support. I will ask for the missing pieces as we go.";
+  statusEl.textContent = "Conversation cleared.";
+  setGuideAnimation(false);
+  updateProgressGarden();
+  updateGenerateButtonState();
+
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {}
+
+  addMessage(
+    "assistant",
+    "Hi, I'm Grant. Start by telling me what project you want funded, who it helps, and what you are asking the government or funder to pay for."
+  );
 }
 
 function updateProgressGarden() {
@@ -222,7 +258,6 @@ function mergePayload(base, update) {
 
 function mergeObject(target, source) {
   if (!source || typeof source !== "object") return target;
-  // empty values never overwrite something we already have
   Object.entries(source).forEach(([key, value]) => {
     if (value === null || value === undefined || value === "") return;
     if (Array.isArray(value)) {
@@ -336,7 +371,6 @@ async function generatePdf() {
   }
 
   statusEl.textContent = "Generating PDF... this can take 15-30 seconds.";
-  // timeline of this request, merged with the backend's own log later
   const requestId = Math.random().toString(36).slice(2, 8);
   const clientStart = Date.now();
   const clientEvents = [];
@@ -458,8 +492,6 @@ function parseWarningsHeader(response) {
   }
 }
 
-// Shows where the RFA requirements actually came from, so nobody
-// submits a draft trusting an unverified source.
 function renderWarnings(warnings) {
   const container = document.getElementById("warnings");
   container.innerHTML = "";
